@@ -1,5 +1,7 @@
 #include <unordered_map>
 #include <queue>
+#include <vector>
+#include <cassert>
 constexpr int32_t maze_width		= 224;
 constexpr int32_t maze_height		= 248;
 constexpr int32_t tile_map_width	= maze_width / 8;
@@ -61,22 +63,97 @@ static int32_t	ghost_tile_y	= 17;
 
 struct Location
 {
+	Location(int32_t x, int32_t y) : x(x), y(y) {};
 	int32_t x, y;
 };
 
-//class graph
-//{
-//public:
-//
-//private:
-//	int32_t 
-//};
-template<typename Location, typename Graph>
-void aStarSearch(Graph graph, Location start, Location goal, std::unordered_map<Location, Location>& cameFrom,
+static Location N(0, -1);
+static Location E(1, 0);
+static Location S(0, 1);
+static Location W(-1, 0);
+
+
+std::vector<Location> neighbours(Location id) 
+{
+	std::vector<Location> results;
+	std::vector<Location> DIRS;
+
+	switch (tile_map[id.x, id.y])
+	{
+	case 0xA:
+		DIRS.push_back(S);
+		DIRS.push_back(E);
+		break;
+	case 0xB:
+		DIRS.push_back(S);
+		DIRS.push_back(N);
+		DIRS.push_back(E);
+		break;
+	case 0xC:
+		DIRS.push_back(E);
+		DIRS.push_back(W);
+		break;
+	case 0xD:
+		DIRS.push_back(N);
+		DIRS.push_back(E);
+		DIRS.push_back(W);
+		break;
+	case 0xE:
+		DIRS.push_back(S);
+		DIRS.push_back(E);
+		DIRS.push_back(W);
+		break;
+	case 0xf:
+		DIRS.push_back(N);
+		DIRS.push_back(E);
+		DIRS.push_back(S);
+		DIRS.push_back(W);
+		break;
+	case 0x3:
+		DIRS.push_back(S);
+		DIRS.push_back(N);
+		break;
+	case 0x5:
+		DIRS.push_back(N);
+		DIRS.push_back(W);
+		break;
+	case 0x6:
+		DIRS.push_back(S);
+		DIRS.push_back(W);
+		break;
+	case 0x7:
+		DIRS.push_back(N);
+		DIRS.push_back(S);
+		DIRS.push_back(W);
+		break;
+	case 0x9:
+		DIRS.push_back(N);
+		DIRS.push_back(E);
+		break;
+	default:
+		assert(false);
+		break;
+	}
+
+	for (Location dir : DIRS)
+	{
+		Location next(id.x + dir.x, id.y + dir.y);
+		results.push_back(next);
+	}
+
+	if ((id.x + id.y) % 2 == 0) {
+		// aesthetic improvement on square grids
+		std::reverse(results.begin(), results.end());
+	}
+
+	return results;
+}
+
+void aStarSearch(Location start, Location goal, std::unordered_map<Location, Location>& cameFrom,
 	std::unordered_map<Location, Location>& costSoFar)
 {
 	std::priority_queue<Location, double> frontier;
-	frontier.push(start, 0);
+	frontier.push(start, 0.0)
 
 	cameFrom[start] = start;
 	costSofar[start] = 0;
