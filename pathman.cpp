@@ -65,6 +65,15 @@ struct Location
 {
 	Location(int32_t x, int32_t y) : x(x), y(y) {};
 	int32_t x, y;
+
+	bool operator==(Location& rh)
+	{
+		if (x == rh.x &&
+			y == rh.y)
+			return true;
+		else
+			return false;
+	}
 };
 
 static Location N(0, -1);
@@ -149,14 +158,23 @@ std::vector<Location> neighbours(Location id)
 	return results;
 }
 
+double heuristic(Location a, Location b) {
+	return std::abs(a.x - b.x) + std::abs(a.y - b.y);
+}
+
+double cost(Location current, Location next)
+{
+	return 1.0;
+}
+
 void aStarSearch(Location start, Location goal, std::unordered_map<Location, Location>& cameFrom,
-	std::unordered_map<Location, Location>& costSoFar)
+	std::unordered_map<Location, double>& costSoFar)
 {
 	std::priority_queue<Location, double> frontier;
-	frontier.push(start, 0.0)
+	frontier.emplace(start, 0.0);
 
 	cameFrom[start] = start;
-	costSofar[start] = 0;
+	costSoFar[start] = 0.0;
 
 	while (!frontier.empty())
 	{
@@ -165,16 +183,16 @@ void aStarSearch(Location start, Location goal, std::unordered_map<Location, Loc
 		if (current == goal)
 			break;
 
-		for (Location next : graph.neighbours(current))
+		for (Location next : neighbours(current))
 		{
-			double newCost = costSoFar[current] + graph.cost(current, next);
+			double newCost = costSoFar[current] + cost(current, next);
 			
-			if (costSoFar.find(next) == costSofar.end()
+			if (costSoFar.find(next) == costSoFar.end()
 				|| newCost < costSoFar[next])
 			{
 				costSoFar[next] == newCost;
 				double prio = newCost + heuristic(next, goal);
-				frontier.push(next, prio);
+				frontier.emplace(next, prio);
 				cameFrom[next] = current;
 			}
 		}
