@@ -61,20 +61,57 @@ static int32_t	pathman_tile_y	= 1;
 static int32_t	ghost_tile_x	= 13;
 static int32_t	ghost_tile_y	= 17;
 
-struct Location
+template<typename T, typename priority_t>
+struct PriorityQueue
 {
-	Location(int32_t x, int32_t y) : x(x), y(y) {};
-	int32_t x, y;
+	typedef std::pair<priority_t, T> PQElement;
+	std::priority_queue<PQElement, std::vector<PQElement>, std::greater<PQElement>> elements;
 
-	bool operator==(Location& rh)
+	inline bool empty() const
 	{
-		if (x == rh.x &&
-			y == rh.y)
-			return true;
-		else
-			return false;
+		return elements.empty();
+	}
+
+	inline void put(T item, priority_t priority)
+	{
+		elements.emplace(priority, item);
+	}
+
+	T get()
+	{
+		T best_item = elements.top().second;
+		elements.pop();
+		return best_item;
 	}
 };
+
+struct Location
+{
+	Location() : x(0), y(0) {};
+	Location(int x, int y) : x(x), y(y) {};
+	int x, y;
+
+	bool operator==(const Location& rh) const
+	{
+		return x == rh.x && y == rh.y;
+	}
+
+	bool operator<(const Location& rh) const
+	{
+		return std::tie(x, y) < std::tie(rh.x, rh.y);
+	}
+};
+
+namespace std {
+	/* implement hash function so we can put GridLocation into an unordered_set */
+	template <> struct hash<Location> {
+		typedef Location argument_type;
+		typedef std::size_t result_type;
+		std::size_t operator()(const Location& id) const noexcept {
+			return std::hash<int>()(id.x ^ (id.y << 4));
+		}
+	};
+}
 
 static Location N(0, -1);
 static Location E(1, 0);
@@ -87,55 +124,55 @@ std::vector<Location> neighbours(Location id)
 	std::vector<Location> results;
 	std::vector<Location> DIRS;
 
-	switch (tile_map[id.x, id.y])
+	switch (tile_map[id.x + (id.y * tile_map_width)])
 	{
-	case 0xA:
+	case 10:
 		DIRS.push_back(S);
 		DIRS.push_back(E);
 		break;
-	case 0xB:
+	case 11:
 		DIRS.push_back(S);
 		DIRS.push_back(N);
 		DIRS.push_back(E);
 		break;
-	case 0xC:
+	case 12:
 		DIRS.push_back(E);
 		DIRS.push_back(W);
 		break;
-	case 0xD:
+	case 13:
 		DIRS.push_back(N);
 		DIRS.push_back(E);
 		DIRS.push_back(W);
 		break;
-	case 0xE:
+	case 14:
 		DIRS.push_back(S);
 		DIRS.push_back(E);
 		DIRS.push_back(W);
 		break;
-	case 0xf:
+	case 15:
 		DIRS.push_back(N);
 		DIRS.push_back(E);
 		DIRS.push_back(S);
 		DIRS.push_back(W);
 		break;
-	case 0x3:
+	case 3:
 		DIRS.push_back(S);
 		DIRS.push_back(N);
 		break;
-	case 0x5:
+	case 5:
 		DIRS.push_back(N);
 		DIRS.push_back(W);
 		break;
-	case 0x6:
+	case 6:
 		DIRS.push_back(S);
 		DIRS.push_back(W);
 		break;
-	case 0x7:
+	case 7:
 		DIRS.push_back(N);
 		DIRS.push_back(S);
 		DIRS.push_back(W);
 		break;
-	case 0x9:
+	case 9:
 		DIRS.push_back(N);
 		DIRS.push_back(E);
 		break;
@@ -151,34 +188,35 @@ std::vector<Location> neighbours(Location id)
 	}
 
 	if ((id.x + id.y) % 2 == 0) {
-		// aesthetic improvement on square grids
+		//aesthetic improvement on square grids
 		std::reverse(results.begin(), results.end());
 	}
 
 	return results;
 }
 
-double heuristic(Location a, Location b) {
-	return std::abs(a.x - b.x) + std::abs(a.y - b.y);
+double heuristic(Location goal, Location from) {
+	return std::abs(goal.x - from.x) + std::abs(goal.y - from.y);
 }
 
 double cost(Location current, Location next)
 {
-	return 1.0;
+	return 0.0;
 }
 
 void aStarSearch(Location start, Location goal, std::unordered_map<Location, Location>& cameFrom,
 	std::unordered_map<Location, double>& costSoFar)
 {
-	std::priority_queue<Location, double> frontier;
-	frontier.emplace(start, 0.0);
+	//std::priority_queue<Location, double, std::greater<double>> frontier;
+	PriorityQueue<Location, double> frontier;
+	frontier.put(start, 0.0);
 
 	cameFrom[start] = start;
 	costSoFar[start] = 0.0;
 
 	while (!frontier.empty())
 	{
-		Location current = frontier.top();
+		Location current = frontier.get();
 
 		if (current == goal)
 			break;
@@ -190,9 +228,9 @@ void aStarSearch(Location start, Location goal, std::unordered_map<Location, Loc
 			if (costSoFar.find(next) == costSoFar.end()
 				|| newCost < costSoFar[next])
 			{
-				costSoFar[next] == newCost;
-				double prio = newCost + heuristic(next, goal);
-				frontier.emplace(next, prio);
+				costSoFar[next] = newCost;
+				double prio = newCost + heuristic(goal, next);
+				frontier.put(next, prio);
 				cameFrom[next] = current;
 			}
 		}
@@ -207,7 +245,7 @@ static void draw_sprite(sprite_batch* sb, texture* sprite_sheet, int32_t tile_x,
 	sprite_batch_draw(sb, sprite_sheet, x * display_scale, y * display_scale, 14 * display_scale, 14 * display_scale, src_x, src_y, 14, 14);
 }
 
-static void render(d3d_context* d3d, sprite_batch* sb, texture* sprite_sheet)
+static void render(d3d_context* d3d, sprite_batch* sb, texture* sprite_sheet, std::unordered_map<Location, Location>& came_from)
 {
 	sprite_batch_begin(sb);
 
@@ -217,6 +255,19 @@ static void render(d3d_context* d3d, sprite_batch* sb, texture* sprite_sheet)
 		draw_sprite(sb, sprite_sheet, ghost_tile_x, ghost_tile_y, 585, 65);
 	else
 		draw_sprite(sb, sprite_sheet, ghost_tile_x, ghost_tile_y, 601, 65);
+	bool path = true;
+
+	Location last(pathman_tile_x, pathman_tile_y), comp;
+	while (path)
+	{
+		if (came_from[last] == comp)
+			path = false;
+		else
+		{
+			draw_sprite(sb, sprite_sheet, came_from[last].x, came_from[last].y, 601, 65);
+			last = came_from[last];
+		}
+	}
 
 	if (++ghost_anim_counter == 16)
 		ghost_anim_counter = 0;
@@ -260,6 +311,13 @@ int main(void)
 	texture sprite_sheet;
 	load_sprite_sheet(&sprite_sheet, &d3d);
 
+	Location start{ pathman_tile_x, pathman_tile_y };
+	Location goal{ ghost_tile_x, ghost_tile_y };
+
+	std::unordered_map<Location, Location> came_from;
+	std::unordered_map<Location, double> cost_so_far;
+	aStarSearch(start, goal, came_from, cost_so_far);
+
 	// Main loop
 	bool quit = false;
 	while (!quit)
@@ -282,7 +340,7 @@ int main(void)
 		begin_frame(&d3d);
 
 		// Rendering code goes here
-		render(&d3d, &sb, &sprite_sheet);
+		render(&d3d, &sb, &sprite_sheet, came_from);
 
 		end_frame(&d3d);
 	}
