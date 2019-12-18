@@ -113,18 +113,18 @@ namespace std {
 	};
 }
 
-static Location N(0, -1);
-static Location E(1, 0);
-static Location S(0, 1);
-static Location W(-1, 0);
-
 
 std::vector<Location> neighbours(Location id) 
 {
 	std::vector<Location> results;
 	std::vector<Location> DIRS;
 
-	switch (tile_map[id.x + (id.y * tile_map_width)])
+	Location N(0, -1);
+	Location E(1, 0);
+	Location S(0, 1);
+	Location W(-1, 0);
+
+	switch (tile_map[id.x + (id.y * tile_map_width)])	//Checks which directions pathman can move based on the flag in tilemap
 	{
 	case 10:
 		DIRS.push_back(S);
@@ -195,13 +195,41 @@ std::vector<Location> neighbours(Location id)
 	return results;
 }
 
-double heuristic(Location goal, Location from) {
-	return std::abs(goal.x - from.x) + std::abs(goal.y - from.y);
+double heuristic(Location next, Location goal)	//for a* search
+{
+	return std::abs(next.x - goal.x) + std::abs(next.y - goal.y);
 }
 
-double cost(Location current, Location next)
+double cost(Location current, Location next)	//We don't have different terrain types, and walls can't be moved to, so cost is always 0
 {
 	return 0.0;
+}
+
+void breadthFirstSearch(Location start, Location goal, std::unordered_map<Location, Location>& cameFrom)
+{
+	std::queue<Location> frontier;
+	frontier.push(start);
+
+	cameFrom[start] = start;
+
+	while (!frontier.empty()) 
+	{
+		Location current = frontier.front();
+		frontier.pop();
+
+		if (current == goal) 
+			break;
+		
+
+		for (Location next : neighbours(current)) 
+		{
+			if (cameFrom.find(next) == cameFrom.end())
+			{
+				frontier.push(next);
+				cameFrom[next] = current;
+			}
+		}
+	}
 }
 
 void aStarSearch(Location start, Location goal, std::unordered_map<Location, Location>& cameFrom,
@@ -229,7 +257,7 @@ void aStarSearch(Location start, Location goal, std::unordered_map<Location, Loc
 				|| newCost < costSoFar[next])
 			{
 				costSoFar[next] = newCost;
-				double prio = newCost + heuristic(goal, next);
+				double prio = newCost + heuristic(next, goal);
 				frontier.put(next, prio);
 				cameFrom[next] = current;
 			}
@@ -257,10 +285,10 @@ static void render(d3d_context* d3d, sprite_batch* sb, texture* sprite_sheet, st
 		draw_sprite(sb, sprite_sheet, ghost_tile_x, ghost_tile_y, 601, 65);
 	bool path = true;
 
-	Location last(pathman_tile_x, pathman_tile_y), comp;
-	while (path)
+	Location last(ghost_tile_x, ghost_tile_y), Start(pathman_tile_x, pathman_tile_y);
+	while (path)	//Draws a ghost sprite along the path calculated for pathman
 	{
-		if (came_from[last] == comp)
+		if (came_from[last] == Start)
 			path = false;
 		else
 		{
@@ -317,6 +345,7 @@ int main(void)
 	std::unordered_map<Location, Location> came_from;
 	std::unordered_map<Location, double> cost_so_far;
 	aStarSearch(start, goal, came_from, cost_so_far);
+	breadthFirstSearch(start, goal, came_from);
 
 	// Main loop
 	bool quit = false;
