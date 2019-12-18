@@ -232,7 +232,40 @@ void breadthFirstSearch(Location start, Location goal, std::unordered_map<Locati
 	}
 }
 
-void aStarSearch(Location start, Location goal, std::unordered_map<Location, Location>& cameFrom,
+void djikstraSearch(Location start, Location goal, std::unordered_map<Location, Location>& cameFrom,
+	std::unordered_map<Location, double>& costSoFar)
+{
+	PriorityQueue<Location, double> frontier;
+	frontier.put(start, 0.0);
+
+	cameFrom[start] = start;
+	costSoFar[start] = 0.0;
+
+	while (!frontier.empty())
+	{
+		Location current = frontier.get();
+
+		if (current == goal)
+			break;
+
+		for (Location next : neighbours(current))
+		{
+			double newCost = costSoFar[current] + cost(current, next);
+
+			if (costSoFar.find(next) == costSoFar.end()
+				|| newCost < costSoFar[next])
+			{
+				costSoFar[next] = newCost;
+				double prio = newCost;
+				frontier.put(next, prio);
+				cameFrom[next] = current;
+			}
+		}
+	}
+
+}
+
+void aStarSearch(Location start, Location goal, std::unordered_map<Location, Location>& cameFrom,	//Same as djikstra, minus the heuristic
 	std::unordered_map<Location, double>& costSoFar)
 {
 	//std::priority_queue<Location, double, std::greater<double>> frontier;
@@ -286,16 +319,21 @@ static void render(d3d_context* d3d, sprite_batch* sb, texture* sprite_sheet, st
 	bool path = true;
 
 	Location last(ghost_tile_x, ghost_tile_y), Start(pathman_tile_x, pathman_tile_y);
-	while (path)	//Draws a ghost sprite along the path calculated for pathman
+	//while (path)	//Draws a ghost sprite along the path calculated for pathman
+	//{
+	//	if (came_from[last] == Start)
+	//		path = false;
+	//	else
+	//	{
+	//		draw_sprite(sb, sprite_sheet, came_from[last].x, came_from[last].y, 601, 65);
+	//		last = came_from[last];
+	//	}
+	//}
+
+	std::for_each(came_from.begin(), came_from.end(), [&sb, &sprite_sheet](std::pair<Location, Location> p)	//Draws a ghost sprite along EVERY node covered by the search algorithm
 	{
-		if (came_from[last] == Start)
-			path = false;
-		else
-		{
-			draw_sprite(sb, sprite_sheet, came_from[last].x, came_from[last].y, 601, 65);
-			last = came_from[last];
-		}
-	}
+		draw_sprite(sb, sprite_sheet, p.second.x, p.second.y, 601, 65);
+	});
 
 	if (++ghost_anim_counter == 16)
 		ghost_anim_counter = 0;
@@ -345,7 +383,8 @@ int main(void)
 	std::unordered_map<Location, Location> came_from;
 	std::unordered_map<Location, double> cost_so_far;
 	aStarSearch(start, goal, came_from, cost_so_far);
-	breadthFirstSearch(start, goal, came_from);
+	//breadthFirstSearch(start, goal, came_from);
+	//djikstraSearch(start, goal, came_from, cost_so_far);
 
 	// Main loop
 	bool quit = false;
